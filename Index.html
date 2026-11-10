@@ -1,0 +1,149 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Micro Pixel Photo Reveal</title>
+
+<style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background: #000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    overflow: hidden;
+}
+
+canvas {
+    width: min(95vw, 872px);
+    height: auto;
+    display: block;
+}
+</style>
+</head>
+
+<body>
+
+<canvas id="canvas"></canvas>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+const photo = new Image();
+photo.src = "IMG_20261022_194305.png";
+
+photo.onload = () => {
+
+    const W = photo.naturalWidth;
+    const H = photo.naturalHeight;
+
+    canvas.width = W;
+    canvas.height = H;
+
+    // Read original photo pixels
+    const temp = document.createElement("canvas");
+    temp.width = W;
+    temp.height = H;
+
+    const tempCtx = temp.getContext("2d");
+    tempCtx.drawImage(photo, 0, 0, W, H);
+
+    const original = tempCtx.getImageData(0, 0, W, H).data;
+
+    const total = W * H;
+
+    // One particle for every original pixel
+    const particles = [];
+
+    let seed = 12345;
+
+    function random() {
+        seed = (seed * 16807) % 2147483647;
+        return (seed - 1) / 2147483646;
+    }
+
+    for (let i = 0; i < total; i++) {
+
+        const x = i % W;
+        const y = Math.floor(i / W);
+
+        particles.push({
+            x: (random() - 0.5) * W * 1.8 + W / 2,
+            y: (random() - 0.5) * H * 1.8 + H / 2,
+
+            targetX: x,
+            targetY: y,
+
+            r: original[i * 4],
+            g: original[i * 4 + 1],
+            b: original[i * 4 + 2]
+        });
+    }
+
+    let startTime = null;
+    const duration = 3500;
+
+    function animate(timestamp) {
+
+        if (!startTime) startTime = timestamp;
+
+        let progress = Math.min(
+            (timestamp - startTime) / duration, 1
+        );
+
+        // Smooth natural movement
+        const ease = progress * progress * (3 - 2 * progress);
+
+        const frame = ctx.createImageData(W, H);
+        const data = frame.data;
+
+        for (let p of particles) {
+
+            const x = Math.round(
+                p.x + (p.targetX - p.x) * ease
+            );
+
+            const y = Math.round(
+                p.y + (p.targetY - p.y) * ease
+            );
+
+            if (x < 0 || x >= W || y < 0 || y >= H)
+                continue;
+
+            const index = (y * W + x) * 4;
+
+            data[index] = p.r;
+            data[index + 1] = p.g;
+            data[index + 2] = p.b;
+            data[index + 3] = 255;
+        }
+
+        ctx.putImageData(frame, 0, 0);
+
+        if (progress < 1) {
+            requestAnimationFrame(animate);
+        } else {
+            // Display exact original photograph
+            ctx.drawImage(photo, 0, 0, W, H);
+        }
+    }
+
+    requestAnimationFrame(animate);
+};
+
+photo.onerror = () => {
+    console.error("Photo not found. Check portrait.jpg filename.");
+};
+</script>
+
+</body>
+</html>
